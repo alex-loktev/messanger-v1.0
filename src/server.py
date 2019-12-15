@@ -11,12 +11,11 @@ from twisted.protocols.basic import LineOnlyReceiver
 
 
 class ServerProtocol(LineOnlyReceiver):
-    factory = 'Server'
+    factory: 'Server'
     login: str = None
 
     def connectionLost(self, reason=connectionDone):
         self.factory.clients.remove(self)
-        self.factory.logins.remove(self.login)
 
     def connectionMade(self):
         self.factory.clients.append(self)
@@ -39,26 +38,30 @@ class ServerProtocol(LineOnlyReceiver):
                     user.sendLine(content.encode())
 
         else:
-            if (content.startswith("login")) and not (content[6:] in self.factory.logins):
-                self.login = content.replace("login:", "")
-                self.factory.logins.append(self.login)
-                self.sendLine("Success connect!".encode())
-                self.send_history()
+            if content.startswith("login:"):
+                for user in self.factory.clients:
+                    if content[6:] == user.login:
+                        self.sendLine("Connect error 11".encode())
+                        self.transport.loseConnection()
+
+                    else:
+                        self.login = content[6:]
+                        self.sendLine("Success connect!".encode())
+                        self.send_history()
+                        break
 
             else:
                 self.sendLine("Connect error".encode())
-                self.connectionLost()
+                self.transport.loseConnection()
 
 
 class Server(ServerFactory):
     protocol = ServerProtocol
     clients: list
-    logins: list
     messages: list
 
     def startFactory(self):
         self.clients = []
-        self.logins = []
         self.messages = []
         print("Server start")
 
